@@ -5,7 +5,7 @@ Codex로 짧은 업무 과제를 할 때 쓰는 개인 작업 지침과 문서 �
 ## 쓰는 법
 
 ```bash
-git clone --depth 1 https://github.com/<계정>/codex-work-kit /tmp/kit
+git clone --depth 1 https://github.com/junodak/codex-work-kit /tmp/kit
 cp /tmp/kit/AGENTS.md ./AGENTS.md
 cp /tmp/kit/templates/PLAN.md /tmp/kit/templates/DECISIONS.md ./
 ```
