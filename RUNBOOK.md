@@ -30,7 +30,7 @@ bash kit/scripts/merge.sh api                                         # 게이�
 - 작업 지시에는 PLAN.md의 조건 ID를 넣는다. 조건 밖 작업은 시키지 않는다.
 - task.sh 전에 PLAN.md·DECISIONS.md와 의존성 설치로 바뀐 package.json·lock을 커밋한다. 워크트리는 커밋된 상태만 본다 (미커밋이면 task.sh가 멈춘다).
 - 진입 파일(server.js·app.py·라우터)은 한 작업만 고치게 지시에 적는다. 안 그러면 두 작업이 모두 고쳐 병합이 충돌한다.
-- 워크트리 작업은 PLAN·DECISIONS를 고치지 않고 보고만 한다. 병합 뒤 주 세션이 옮긴다 (병렬 작업끼리 충돌하지 않게).
+- 워크트리 작업은 PLAN·DECISIONS를 고치지 않고 보고만 한다. 병합 뒤 주 세션이 PLAN 상태(검증됨)와 DECISIONS.md를 갱신한다 (병렬 작업끼리 충돌하지 않게).
 - 워크트리 리뷰의 기준은 그 작업이 갈라진 커밋이다 (이미 병합된 앞 작업은 다시 리뷰하지 않는다).
 - 의존성(node_modules·.venv)은 주 폴더에 먼저 설치한다. task.sh가 워크트리에 링크하고, 의존성·캐시·.env는 커밋에서 뺀다.
 - check.sh는 찾은 러너를 전부 돌고, 하나도 못 찾으면 실패다. 테스트가 정말 없는 과제면 check와 merge 모두 `NO_TESTS=1`을 앞에 붙인다.
