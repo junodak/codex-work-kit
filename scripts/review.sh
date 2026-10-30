@@ -10,6 +10,7 @@ BASE="${2:-$(git rev-parse -q --verify work-base 2>/dev/null || git rev-list --m
 OUT="reviews/review-$(date -u +%Y%m%dT%H%M%SZ).jsonl"
 
 # ---- 준비
+git rev-parse -q --verify "$BASE^{commit}" >/dev/null || { echo "BASE가 커밋이 아니다: $BASE (모델 이름에 공백이 있으면 따옴표로 감싼다)"; exit 1; }
 [ -d kit/review ] || { echo "작업 폴더 루트에서 실행하세요"; exit 1; }
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "git 저장소가 아니다. 먼저 kit/scripts/setup.sh"; exit 1; }
 mkdir -p reviews
@@ -19,4 +20,5 @@ PROMPT="$(cat kit/review/prompts/common.md)
 관점: 전체. 요구 위반과 틀린 결과를 우선 찾아라.
 BASE=$BASE"
 codex exec -s read-only -m "$MODEL" -C . --json "$PROMPT" < /dev/null > "$OUT"
+python3 -B kit/scripts/lastmsg.py "$OUT" || true
 echo "저장: $OUT"

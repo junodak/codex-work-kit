@@ -13,6 +13,7 @@ KIT=kit/review
 OUT="reviews/$ROUND"
 
 # ---- 준비
+git rev-parse -q --verify "$BASE^{commit}" >/dev/null || { echo "BASE가 커밋이 아니다: $BASE (모델 이름에 공백이 있으면 따옴표로 감싼다)"; exit 1; }
 [[ "$ROUND" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "라운드명은 영문·숫자·_-만"; exit 1; }
 [ -d "$KIT/prompts" ] || { echo "작업 폴더 루트에서 실행하세요"; exit 1; }
 [ -e "$OUT" ] && { echo "이미 있음: $OUT (라운드명을 바꾸세요)"; exit 1; }
@@ -33,33 +34,18 @@ BASE=$BASE"
 done
 for pid in "${pids[@]}"; do wait "$pid" || true; done
 
-# ---- 마지막 답 추출. 이벤트 형식은 버전마다 다를 수 있으니 원본 jsonl이 정본이다
-python3 - "$OUT" << 'PY'
-import json, re, sys, pathlib
+# ---- 마지막 답 추출 (kit/scripts/lastmsg.py). 원본 jsonl이 정본이다
+python3 -B - "$OUT" << 'PY'
+import re, sys, pathlib
+sys.path.insert(0, "kit/scripts")
+from lastmsg import last_message
 out = pathlib.Path(sys.argv[1])
 def count(text, grade):  # "등급: P1", "등급: **P1**" 모두 센다
     return len(re.findall(r"등급\W*" + grade + r"\b", text))
-def texts(o):  # type/item_type, agent_message/assistant_message 모두 처리
-    if isinstance(o, dict):
-        kind = " ".join(str(o.get(k, "")) for k in ("type", "item_type", "kind", "role"))
-        if ("message" in kind or "assistant" in kind) and "user" not in kind and isinstance(o.get("text"), str):
-            yield o["text"]
-        for v in o.values():
-            yield from texts(v)
-    elif isinstance(o, list):
-        for v in o:
-            yield from texts(v)
 failed = (out / "failed.txt").read_text(encoding="utf-8").split() if (out / "failed.txt").exists() else []
 parts, rows = [], []
 for f in sorted(out.glob("*.jsonl")):
-    last = ""
-    for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
-        try:
-            for t in texts(json.loads(line)):
-                last = t
-        except json.JSONDecodeError:
-            pass
-    last = last or "(마지막 답을 찾지 못함. jsonl 원본을 직접 확인)"
+    last = last_message(f) or "(마지막 답을 찾지 못함. jsonl 원본을 직접 확인)"
     (out / f"{f.stem}.md").write_text(last + "\n", encoding="utf-8")
     parts.append(f"## {f.stem}\n\n{last}\n")
     rows.append(f"| {f.stem} | {count(last, 'P1')} | {count(last, 'P2')} |")

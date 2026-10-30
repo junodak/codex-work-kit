@@ -8,12 +8,28 @@
 |---|---|---|
 | 0~5분 | `git clone --depth 1 https://github.com/junodak/codex-work-kit kit && bash kit/scripts/setup.sh`, `/status`로 모델·권한·컨텍스트 확인 | 키트 흡수, baseline, 도구 상태 확인 |
 | 5~25분 | 과제 안내는 **사람이 직접** 읽는다. 담당자에게 다음 구현을 바꾸는 질문 1~2개씩. PLAN.md 조건표 작성 | **완료 조건 고정** |
-| 25~120분 | 주 세션이 작은 단위로 구현 → 실행 → 검증 → 커밋. 하위 에이전트 하나가 조사·반증 (파일 수정 금지, 5분 마감) | 핵심 흐름이 실제로 동작 |
+| 25~120분 | 주 세션이 작은 단위로 구현 → 실행 → 검증(`bash kit/scripts/check.sh`) → 커밋. 하위 에이전트 하나가 조사·반증 (파일 수정 금지, 5분 마감) | 핵심 흐름이 실제로 동작 |
 | 120~145분 | 조건별 정상·실패·경계 확인. 화면은 사람이 직접 확인 | 필수 조건마다 마지막 실행 결과 |
 | 145~153분 | 다관점 블라인드 리뷰 1라운드 (`bash kit/scripts/review-round.sh R1 <모델>`) → summary.md를 읽고 triage.md에 판정 | 결과와 무관하게 종료 |
 | 153~165분 | 재확인해 채택한 지적만 수정, 같은 명령으로 재검증. 시간이 남으면 R2 (프롬프트는 그대로) | 마지막 변경 뒤 재검증 |
-| 165~170분 | DECISIONS.md와 실제 코드 대조, 핵심 코드 경로를 사람이 읽기, 저장 상태 확인 | 설명 가능한 상태 |
+| 165~170분 | DECISIONS.md와 실제 코드 대조, `bash kit/scripts/self-quiz.sh <모델>`로 설명 질문 6개를 뽑아 머릿속으로 답해 보기, 저장 상태 확인 | 설명 가능한 상태 |
 | 170분 | 제출 | 여유를 두고 확정 |
+
+## 파이프라인: 조사 → 워크트리 → 리뷰 → 게이트 병합
+
+```bash
+bash kit/scripts/research.sh "<모델>" <주제> "<하려는 것 한 문장>"     # notes/research-<주제>.md
+bash kit/scripts/task.sh "<모델>" api "<지시>" &                      # work/api, 브랜치 task/api
+bash kit/scripts/task.sh "<모델>" ui  "<지시>" &                      # 겹치지 않는 영역만 병렬로
+wait
+(cd work/api && bash kit/scripts/check.sh && bash kit/scripts/review-round.sh R1 "<모델>")   # triage.md 작성
+bash kit/scripts/merge.sh api                                         # 게이트 통과 시에만 병합
+```
+
+- 동시 워크트리는 2개까지. 서로 같은 파일을 고치지 않게 나눈다 (예: API와 화면).
+- 작업 지시에는 PLAN.md의 조건 ID를 넣는다. 조건 밖 작업은 시키지 않는다.
+- 병합 순서는 의존 순서대로 (API 먼저, 화면 나중). 두 번째 병합 전에 워크트리를 최신 main으로 다시 만든다.
+- 작은 과제면 워크트리 없이 주 세션 하나로 한다. 파이프라인은 일이 둘 이상으로 갈라질 때 쓴다.
 
 ## 병렬 운영
 
