@@ -10,19 +10,19 @@
 | 5~25분 | 과제 안내는 **사람이 직접** 읽는다. 담당자에게 다음 구현을 바꾸는 질문 1~2개씩. PLAN.md 조건표 작성 | **완료 조건 고정** |
 | 25~120분 | 주 세션이 작은 단위로 구현 → 실행 → 검증(`bash kit/scripts/check.sh`) → 커밋. 하위 에이전트 하나가 조사·반증 (파일 수정 금지, 5분 마감) | 핵심 흐름이 실제로 동작 |
 | 120~145분 | 조건별 정상·실패·경계 확인. 화면은 사람이 직접 확인 | 필수 조건마다 마지막 실행 결과 |
-| 145~153분 | 다관점 블라인드 리뷰 1라운드 (`bash kit/scripts/review-round.sh R1 <모델>`) → summary.md를 읽고 triage.md에 판정 | 결과와 무관하게 종료 |
+| 145~153분 | 다관점 블라인드 리뷰 1라운드 (`bash kit/scripts/review-round.sh R1 "<모델 ID>"`) → summary.md를 읽고 triage.md에 판정 | 결과와 무관하게 종료 |
 | 153~165분 | 재확인해 채택한 지적만 수정, 같은 명령으로 재검증. 시간이 남으면 R2 (프롬프트는 그대로) | 마지막 변경 뒤 재검증 |
-| 165~170분 | DECISIONS.md와 실제 코드 대조, `bash kit/scripts/self-quiz.sh <모델>`로 설명 질문 6개를 뽑아 머릿속으로 답해 보기, 저장 상태 확인 | 설명 가능한 상태 |
+| 165~170분 | DECISIONS.md와 실제 코드 대조, `bash kit/scripts/self-quiz.sh "<모델 ID>"`로 설명 질문 6개를 뽑아 머릿속으로 답해 보기, 저장 상태 확인 | 설명 가능한 상태 |
 | 170분 | 제출 | 여유를 두고 확정 |
 
 ## 파이프라인: 조사 → 워크트리 → 리뷰 → 게이트 병합
 
 ```bash
-bash kit/scripts/research.sh "<모델>" <주제> "<하려는 것 한 문장>"     # notes/research-<주제>.md
-bash kit/scripts/task.sh "<모델>" api "<지시>" &                      # .work/api, 브랜치 task/api
-bash kit/scripts/task.sh "<모델>" ui  "<지시>" &                      # 겹치지 않는 영역만 병렬로
+bash kit/scripts/research.sh "<모델 ID>" <주제> "<하려는 것 한 문장>"     # notes/research-<주제>.md
+bash kit/scripts/task.sh "<모델 ID>" api "<지시>" &                      # .work/api, 브랜치 task/api
+bash kit/scripts/task.sh "<모델 ID>" ui  "<지시>" &                      # 겹치지 않는 영역만 병렬로
 wait
-(cd .work/api && bash kit/scripts/check.sh && bash kit/scripts/review-round.sh R1 "<모델>")   # triage.md 작성
+(cd .work/api && bash kit/scripts/check.sh && bash kit/scripts/review-round.sh R1 "<모델 ID>")   # triage.md 작성
 bash kit/scripts/merge.sh api                                         # 게이트 통과 시에만 병합
 ```
 
@@ -61,7 +61,8 @@ bash kit/scripts/merge.sh api                                         # 게이�
 - 리뷰 결과를 기다리느라 필수 작업을 멈추지 않는다. 마감이 지나면 "미검토"로 두고 간다.
 - 리뷰 지적은 그대로 믿지 않는다. 코드·테스트로 재확인한 것만 고친다. 방법은 `kit/docs/methods.md` 1절.
 - **판정 초안은 에이전트가, 판정 완료는 사람이.** 에이전트는 triage.md에 재확인 결과와 채택·기각 초안을 쓴다. 사람이 읽고 동의할 때만 `판정 완료: [x]`로 바꾼다. 병합 게이트는 이 표시만 믿는다.
-- 리뷰 관점 4개를 동시에 돌리면 토큰을 그만큼 쓴다. 시간이 빠듯하면 `kit/review/prompts`에서 관점 파일을 빼서 줄인다.
+- 리뷰 관점 4개를 동시에 돌리면 토큰을 그만큼 쓴다. 시간이 빠듯하면 `ONLY="1 2" bash kit/scripts/review-round.sh R1 "<모델 ID>"`처럼 관점 번호만 골라 돌린다 (kit/ 파일은 지우지 않는다).
+- vitest·jest처럼 점 폴더도 모으는 러너면 테스트 설정의 exclude에 `.work/**`를 넣는다 (check.sh가 경고한다).
 
 ## 컨텍스트와 토큰
 

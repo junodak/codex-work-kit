@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 독립된 일 하나를 git 워크트리에서 Codex에게 맡긴다. 여러 개를 동시에 띄울 수 있다.
 # 사용 (작업 폴더 루트에서): bash kit/scripts/task.sh <모델> <작업-이름> "<지시>"
-#   예: bash kit/scripts/task.sh "<모델 ID>" api "PLAN.md의 R1·R2를 만족하는 API를 구현하고 테스트를 추가해"
+#   예: bash kit/scripts/task.sh "<모델 ID>" api "PLAN.md의 C1·C2를 만족하는 API를 구현하고 테스트를 추가해"
 # 결과: .work/<이름> (워크트리, 브랜치 task/<이름>), reviews/task-<이름>.jsonl (작업 기록)
 # 워크트리를 점(.) 폴더에 두는 이유: 주 작업 폴더의 테스트 도구(node --test, pytest)가 워크트리 테스트까지 재귀로 돌리지 않게.
 # Codex는 파일만 고치고, 커밋은 이 스크립트가 한다 (샌드박스가 워크트리 밖 .git에 못 쓸 수 있다).
@@ -19,13 +19,13 @@ LOG="reviews/task-$NAME.jsonl"
 [[ "$NAME" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "작업 이름은 영문·숫자·_-만"; exit 1; }
 [ -f kit/scripts/lastmsg.py ] || { echo "작업 폴더 루트에서 실행하세요"; exit 1; }
 TARGET="$(git branch --show-current)"
-[ -n "$TARGET" ] || { echo "중단: 주 폴더가 브랜치 위에 있지 않다(분리 HEAD). git switch <주 브랜치> 뒤 다시."; exit 1; }
+[ -n "$TARGET" ] || { echo "중단: 주 폴더가 브랜치 위에 있지 않다(분리 HEAD). git switch -c main 처럼 지금 위치에 브랜치를 만든 뒤 다시 (git switch <기존 브랜치>는 작업을 버릴 수 있다)."; exit 1; }
 if [ -e "$WT" ] || git rev-parse -q --verify "refs/heads/$BR" >/dev/null; then
   echo "이미 있음: $WT 또는 브랜치 $BR. 다른 이름을 쓴다 (버릴 거면: git worktree remove --force $WT; git branch -D $BR)"; exit 1
 fi
 exclude_local() {  # 워크트리·의존성·캐시·비밀 파일은 커밋하지 않는다 (모든 워크트리가 공유하는 제외 목록)
   local ex; ex="$(git rev-parse --git-path info/exclude)"; mkdir -p "$(dirname "$ex")"  # .git이 파일이거나 상위 폴더에 있어도
-  for pat in .work/ node_modules .venv venv __pycache__ '*.pyc' .env; do
+  for pat in .work/ reviews/ node_modules .venv venv __pycache__ '*.pyc' .env; do
     grep -qxF "$pat" "$ex" 2>/dev/null || echo "$pat" >> "$ex"
   done
 }
@@ -42,8 +42,11 @@ echo "$TARGET" > "$(git -C "$WT" rev-parse --absolute-git-dir)/kit-target"  # �
 echo "워크트리: $WT (브랜치 $BR, 기준 $TARGET $(git rev-parse --short HEAD))"
 # 주 폴더의 설치된 의존성을 워크트리에서 쓰게 링크한다 (새 checkout에는 없다)
 for dep in node_modules .venv venv; do
-  if [ -d "$dep" ] && [ ! -e "$WT/$dep" ]; then ln -s "$(pwd)/$dep" "$WT/$dep"; echo "의존성 링크: $WT/$dep"; fi
+  if [ -d "$dep" ] && [ ! -e "$WT/$dep" ]; then ln -s "$(pwd -P)/$dep" "$WT/$dep"; echo "의존성 링크: $WT/$dep"; fi
 done
+# 커밋하지 않는 실행 설정(.env)은 복사한다. 링크면 워크트리 작업이 주 폴더의 .env를 덮어쓴다
+if [ -f .env ] && [ ! -e "$WT/.env" ] && [ -z "$(git ls-tree HEAD -- .env)" ]; then cp -p .env "$WT/.env"; echo "복사: $WT/.env"; fi
+if [ -n "$(git status --porcelain -- notes 2>/dev/null)" ]; then echo "주의: 커밋 안 된 notes/는 워크트리에 없다. 작업자가 봐야 하면 커밋하거나 지시에 요지를 넣는다."; fi
 
 # ---- 실행 (작업 폴더 안에서만 쓰기)
 PROMPT="이 워크트리에서 아래 작업만 한다. AGENTS.md와 PLAN.md를 먼저 읽어라.

@@ -17,7 +17,7 @@ ensure_identity() {
 }
 exclude_local() {  # 워크트리·의존성·캐시·비밀 파일은 커밋하지 않는다 (모든 워크트리가 공유하는 제외 목록)
   local ex; ex="$(git rev-parse --git-path info/exclude)"; mkdir -p "$(dirname "$ex")"  # .git이 파일이거나 상위 폴더에 있어도
-  for pat in .work/ node_modules .venv venv __pycache__ '*.pyc' .env; do
+  for pat in .work/ reviews/ node_modules .venv venv __pycache__ '*.pyc' .env; do
     grep -qxF "$pat" "$ex" 2>/dev/null || echo "$pat" >> "$ex"
   done
 }
@@ -44,6 +44,10 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 else
   ensure_identity
   exclude_local
+  if [ -n "$(git status --porcelain -- . ":!$KIT")" ]; then
+    echo "주의: 주어진 저장소에 커밋 안 된 변경이 있다. 내 작업과 섞이지 않게 먼저 'baseline: 주어진 미커밋 상태'로 커밋할지 판단한다:"
+    git status --short -- . ":!$KIT" | head -5
+  fi
   if [ -n "$(git diff --cached --name-only)" ]; then
     echo "주의: 이미 stage된 변경이 있다. 키트 커밋에는 넣지 않고 그대로 둔다."
   fi
@@ -68,8 +72,11 @@ else
   git commit -q -m "작업 키트와 기록 양식 추가" -- "$KIT" "${FILES[@]}"
   echo "커밋: 작업 키트와 기록 양식 추가"
 fi
-git tag -f "$BASE_TAG" >/dev/null
-echo "리뷰 기준 태그: $BASE_TAG ($(git rev-parse --short HEAD))"
+if git rev-parse -q --verify "refs/tags/$BASE_TAG" >/dev/null; then  # 다시 실행해도 기준을 옮기지 않는다
+  echo "리뷰 기준 태그 유지: $BASE_TAG ($(git rev-parse --short "$BASE_TAG")). 옮기려면 git tag -f $BASE_TAG"
+else
+  git tag "$BASE_TAG"; echo "리뷰 기준 태그: $BASE_TAG ($(git rev-parse --short HEAD))"
+fi
 
 # ---- 5. 요약
 git log --oneline | head -3

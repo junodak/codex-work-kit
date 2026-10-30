@@ -14,14 +14,14 @@ BR="task/$NAME"
 # ---- 준비
 [ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ] || { echo "주 작업 폴더 루트에서 실행한다 (지금 위치: $(pwd)). 워크트리 안이면 cd 로 루트로."; exit 1; }
 [ -d "$WT" ] || { echo "워크트리 없음: $WT"; exit 1; }
-# 실패 시 reset --hard로 되돌리므로 tracked 변경은 하나도 없어야 한다. 새 파일은 .work·reviews·notes 아래만 허용
+# 실패 시 병합을 되돌리므로 시작할 때 tracked 변경은 하나도 없어야 한다. 새 파일은 .work·reviews·notes 아래만 허용
 [ -z "$(git status --porcelain --untracked-files=no)" ] && [ -z "$(git status --porcelain -- . ':!.work' ':!reviews' ':!notes')" ] \
   || { echo "주 브랜치에 커밋 안 된 변경이 있다. 필요한 변경(의존성의 package.json·lock 등)은 커밋하고, 아니면 되돌린 뒤 다시:"; git status --short -- . ':!.work' ':!reviews' ':!notes' | head -10; exit 1; }
 TARGET="$(git branch --show-current)"
-[ -n "$TARGET" ] || { echo "중단: 주 폴더가 브랜치 위에 있지 않다(분리 HEAD). git switch <주 브랜치> 뒤 다시."; exit 1; }
+[ -n "$TARGET" ] || { echo "중단: 주 폴더가 브랜치 위에 있지 않다(분리 HEAD). git switch -c main 처럼 지금 위치에 브랜치를 만든 뒤 다시 (git switch <기존 브랜치>는 작업을 버릴 수 있다)."; exit 1; }
 WANT="$(cat "$(git -C "$WT" rev-parse --absolute-git-dir)/kit-target" 2>/dev/null || true)"
 [ -z "$WANT" ] || [ "$WANT" = "$TARGET" ] || { echo "중단: $NAME 은 $WANT 에서 갈라졌는데 지금 주 폴더는 $TARGET 이다. git switch $WANT 뒤 다시."; exit 1; }
-ROOT="$(pwd)"
+ROOT="$(pwd -P)"
 # 검사기(kit/)는 작업 브랜치가 바꿀 수 없다. 바꿨다면 게이트가 바뀐 검사기로 돌게 된다
 git diff --quiet "HEAD...$BR" -- kit || { echo "실패: $BR 이 kit/를 고쳤다. 검사기 변경은 병합하지 않는다."; exit 1; }
 
@@ -30,7 +30,7 @@ echo "== 게이트 1: $WT 에서 커밋 안 된 작업 변경 없음 + check.sh"
 [ -z "$(git -C "$WT" status --porcelain -- . ':!reviews')" ] || { echo "실패: 워크트리에 커밋 안 된 변경이 있다. 커밋하거나 버린 뒤 다시."; exit 1; }
 [ -z "$(git -C "$WT" status --porcelain --ignored -- kit)" ] || { echo "실패: 워크트리의 kit/에 원본과 다른 파일이 있다. 검사기는 작업이 바꾸지 않는다."; exit 1; }
 for dep in node_modules .venv venv; do  # task.sh가 만든 의존성 링크가 주 폴더를 가리키는지
-  if [ -e "$dep" ] && [ -e "$WT/$dep" ] && { [ ! -L "$WT/$dep" ] || [ "$(readlink "$WT/$dep")" != "$ROOT/$dep" ]; }; then
+  if [ -e "$dep" ] && [ -e "$WT/$dep" ] && [ -z "$(git ls-tree HEAD -- "$dep")" ] && { [ ! -L "$WT/$dep" ] || [ "$(readlink "$WT/$dep")" != "$ROOT/$dep" ]; }; then
     echo "실패: $WT/$dep 가 주 폴더의 $dep 링크가 아니다."; exit 1
   fi
 done
@@ -64,7 +64,7 @@ if bash kit/scripts/check.sh; then
     echo "병합은 완료. 워크트리 정리 실패: $WT 를 직접 확인하세요"
   fi
 else
-  git reset -q --hard "$BEFORE"  # 시작 때 tracked 변경이 없음을 확인했다. 커밋 안 된 새 파일(notes 등)은 남는다
+  git reset -q --keep "$BEFORE" || { echo "실패: 병합 후 검증이 실패했는데 자동으로 되돌리지 못했다 (그사이 바뀐 파일이 병합과 겹친다). 지금 HEAD는 병합 커밋이다. 바뀐 파일을 저장한 뒤 git reset --hard $BEFORE"; exit 1; }  # 병합 커밋만 되돌리고 그사이 바뀐 파일은 지킨다
   echo "실패: 병합 후 검증. 병합을 되돌렸다 ($TARGET = $(git rev-parse --short HEAD)). 워크트리는 남겨 둔다."
   exit 1
 fi

@@ -20,6 +20,7 @@ OUT="reviews/$ROUND"
 # ---- 준비
 git rev-parse -q --verify "$BASE^{commit}" >/dev/null || { echo "BASE가 커밋이 아니다: $BASE (모델 이름에 공백이 있으면 따옴표로 감싼다)"; exit 1; }
 [ "$(git rev-parse "$BASE^{commit}")" != "$(git rev-parse HEAD)" ] || { echo "중단: 리뷰할 변경이 없다 (BASE = HEAD). 워크트리 작업이면 .work/<이름> 안에서, 주 폴더면 커밋한 뒤 실행한다."; exit 1; }
+[ -z "$(git status --porcelain --untracked-files=no)" ] || echo "주의: 커밋 안 된 변경이 있다. 리뷰는 커밋된 HEAD만 본다."
 [[ "$ROUND" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "라운드명은 영문·숫자·_-만"; exit 1; }
 [ -d "$KIT/prompts" ] || { echo "작업 폴더 루트에서 실행하세요"; exit 1; }
 [ -e "$OUT" ] && { echo "이미 있음: $OUT (라운드명을 바꾸세요)"; exit 1; }
@@ -31,6 +32,7 @@ echo "$BASE" > "$OUT/BASE.txt"
 pids=()
 for p in "$KIT"/prompts/[0-9]-*.md; do
   name="$(basename "$p" .md)"
+  if [ -n "${ONLY:-}" ] && ! echo " $ONLY " | grep -q " ${name%%-*} "; then continue; fi  # ONLY="1 2" 로 관점만 골라 돌린다
   prompt="$(cat "$KIT/prompts/common.md" "$p")
 BASE=$BASE"
   ( codex exec -s read-only -m "$MODEL" -C . --json "$prompt" < /dev/null > "$OUT/$name.jsonl" 2> "$OUT/$name.err" \
@@ -47,7 +49,7 @@ sys.path.insert(0, "kit/scripts")
 from lastmsg import last_message
 out = pathlib.Path(sys.argv[1])
 def count(text, grade):  # "등급: P1", "등급: **P1**" 모두 센다
-    return len(re.findall(r"등급\W*" + grade + r"\b", text))
+    return len(re.findall(r"등급\W*" + grade + r"(?![0-9])", text))
 failed = (out / "failed.txt").read_text(encoding="utf-8").split() if (out / "failed.txt").exists() else []
 parts, rows = [], []
 for f in sorted(out.glob("*.jsonl")):
