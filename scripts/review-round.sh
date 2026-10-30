@@ -40,6 +40,7 @@ BASE=$BASE"
   pids+=("$!")
   echo "시작: $name"
 done
+[ ${#pids[@]} -gt 0 ] || { echo "실패: 돌린 관점이 없다 (ONLY=\"${ONLY:-}\"). 예: ONLY=\"1 2\""; exit 1; }
 for pid in "${pids[@]}"; do wait "$pid" || true; done
 
 # ---- 마지막 답 추출 (kit/scripts/lastmsg.py). 원본 jsonl이 정본이다

@@ -8,13 +8,14 @@ BASE="$(git rev-parse -q --verify work-base 2>/dev/null || true)"
 rc=0
 mkdir -p reviews
 found=0
-run() { echo "\$ $*"; "$@"; local r=$?; found=1; [ $r -eq 0 ] || rc=$r; }
+run() { echo "\$ $*"; CI=1 "$@" < /dev/null; local r=$?; found=1; [ $r -eq 0 ] || rc=$r; }  # CI=1·입력 없음: watch 모드로 멈추지 않게
+killtree() { local c; for c in $(pgrep -P "$1" 2>/dev/null); do killtree "$c"; done; kill "$1" 2>/dev/null; }
 
 # ---- 테스트 (찾은 러너를 전부 실행한다. 백엔드·화면이 다른 언어일 수 있다)
-if [ -f package.json ] && grep -q '"test"' package.json; then
+if [ -f package.json ] && grep -q '"test"' package.json && ! grep -q 'no test specified' package.json; then  # npm init 기본값은 테스트가 아니다
   # vitest·jest 설정에 따라 .work/(다른 워크트리)의 테스트까지 모을 수 있다
-  if [ -d .work ] && grep -q vitest package.json && ! grep -rqs "\.work" vitest.config.* vite.config.* package.json; then
-    echo "주의: vitest가 .work/의 다른 워크트리 테스트까지 돌 수 있다. 설정 test.exclude에 '.work/**' 를 넣는다."
+  if [ -d .work ] && grep -qE '"(vitest|jest)' package.json && ! grep -rqs "\.work" vitest.config.* vite.config.* jest.config.* package.json; then
+    echo "주의: vitest·jest는 .work/의 다른 워크트리 테스트까지 돈다. 설정에서 제외한다 (vitest test.exclude / jest testPathIgnorePatterns 에 .work)."
   fi
   run npm test --silent
 fi
@@ -22,17 +23,28 @@ if [ -f pyproject.toml ] || [ -f pytest.ini ] || [ -f setup.cfg ] || compgen -G 
   PY=python3  # 작업 폴더의 가상환경이 있으면 그 python (설치한 pytest가 거기 있다)
   for v in .venv venv; do if [ -x "$v/bin/python" ]; then PY="$v/bin/python"; break; fi; done
   if "$PY" -c "import pytest" 2>/dev/null; then run "$PY" -m pytest -q
-  elif grep -lqsE '^def test_' tests/*.py test_*.py */test_*.py 2>/dev/null; then
-    # unittest는 pytest 형식 함수를 조용히 건너뛴다. 일부만 돌고 통과하는 것을 막는다
-    found=1; rc=1; echo "실패: pytest 형식 테스트(def test_...)가 있는데 pytest가 없다. $PY -m pip install pytest"
-  else  # pytest가 없으면 표준 unittest. 테스트가 tests/ 밖에 있을 수도 있다
-    START=.; [ -d tests ] && START=tests
-    echo "\$ $PY -m unittest discover -s $START"
-    out="$("$PY" -m unittest discover -s "$START" 2>&1)"; r=$?; found=1
-    echo "$out"
-    # 버전에 따라 0개 실행을 통과로 끝낸다. 가짜 통과를 막는다
-    if echo "$out" | grep -q '^Ran 0 tests'; then r=1; echo "unittest가 테스트를 0개 실행했다. pytest 형식 테스트면 pytest를 설치한다 ($PY -m pip install pytest)"; fi
-    [ $r -eq 0 ] || rc=$r
+  else  # pytest가 없으면 표준 unittest. 테스트 파일이 있는 폴더마다 따로 찾는다 (하위 폴더가 조용히 빠지지 않게)
+    tfiles="$(find . \( -path ./.git -o -path ./.work -o -path ./node_modules -o -path ./.venv -o -path ./venv -o -path ./kit \) -prune -o -name 'test_*.py' -print)"
+    nonut=""; dirs=""
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      grep -q unittest "$f" || nonut="$nonut $f"
+      d="$(dirname "$f")"; case " $dirs " in *" $d "*) ;; *) dirs="$dirs $d" ;; esac
+    done <<< "$tfiles"
+    if [ -n "$nonut" ]; then
+      # unittest는 pytest 형식 테스트를 조용히 건너뛴다. 일부만 돌고 통과하는 것을 막는다
+      found=1; rc=1; echo "실패: unittest를 쓰지 않는(pytest 형식) 테스트가 있는데 pytest가 없다:$nonut → $PY -m pip install pytest"
+    else
+      [ -n "$dirs" ] || dirs="."
+      for START in $dirs; do
+        echo "\$ $PY -m unittest discover -s $START"
+        out="$("$PY" -m unittest discover -s "$START" 2>&1)"; r=$?; found=1
+        echo "$out"
+        # 버전에 따라 0개 실행을 통과로 끝낸다. 가짜 통과를 막는다
+        if echo "$out" | grep -q '^Ran 0 tests'; then r=1; echo "unittest가 테스트를 0개 실행했다 ($START)"; fi
+        [ $r -eq 0 ] || rc=$r
+      done
+    fi
   fi
 fi
 if [ -f go.mod ]; then
@@ -63,7 +75,7 @@ if [ -n "${SMOKE_CMD:-}" ] && [ -n "${SMOKE_URL:-}" ]; then
       sleep 1
     done
   fi
-  [ -n "${spid:-}" ] && { kill "$spid" 2>/dev/null; pkill -P "$spid" 2>/dev/null; wait "$spid" 2>/dev/null; }
+  [ -n "${spid:-}" ] && { killtree "$spid"; wait "$spid" 2>/dev/null; }  # npm → sh → node 처럼 손자까지 끈다
   echo "스모크 응답: HTTP $code (서버 로그: reviews/smoke-server.log)"
   case "$code" in 2*|3*) ;; *) rc=1 ;; esac
 fi

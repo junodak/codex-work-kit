@@ -25,7 +25,7 @@ if [ -e "$WT" ] || git rev-parse -q --verify "refs/heads/$BR" >/dev/null; then
 fi
 exclude_local() {  # 워크트리·의존성·캐시·비밀 파일은 커밋하지 않는다 (모든 워크트리가 공유하는 제외 목록)
   local ex; ex="$(git rev-parse --git-path info/exclude)"; mkdir -p "$(dirname "$ex")"  # .git이 파일이거나 상위 폴더에 있어도
-  for pat in .work/ reviews/ node_modules .venv venv __pycache__ '*.pyc' .env; do
+  for pat in /.work/ /reviews/ node_modules /.venv /venv __pycache__ '*.pyc' .env; do  # /로 시작 = 루트만 (app/reviews/ 같은 코드 폴더는 건드리지 않는다)
     grep -qxF "$pat" "$ex" 2>/dev/null || echo "$pat" >> "$ex"
   done
 }
@@ -33,7 +33,7 @@ exclude_local
 # 워크트리는 커밋된 상태만 본다. 커밋 안 된 변경(PLAN.md, 의존성 설치로 바뀐 package.json 등)이 있으면 멈춘다
 pending="$(git status --porcelain -- . ':!.work' ':!reviews' ':!notes')"
 if [ -n "$pending" ]; then
-  echo "중단: 커밋 안 된 변경이 있다. 워크트리에 안 들어간다. 먼저 커밋한다 (의존성을 설치했으면 package.json·lock 파일도):"
+  echo "중단: 커밋 안 된 변경이 있다. 워크트리에 안 들어간다. 먼저 커밋한다 (의존성을 설치했으면 package.json·lock 파일도). 테스트·실행이 만든 산출물(db·로그)이면 .gitignore에 넣는다:"
   echo "$pending" | head -10; exit 1
 fi
 mkdir -p .work reviews
@@ -45,7 +45,10 @@ for dep in node_modules .venv venv; do
   if [ -d "$dep" ] && [ ! -e "$WT/$dep" ]; then ln -s "$(pwd -P)/$dep" "$WT/$dep"; echo "의존성 링크: $WT/$dep"; fi
 done
 # 커밋하지 않는 실행 설정(.env)은 복사한다. 링크면 워크트리 작업이 주 폴더의 .env를 덮어쓴다
-if [ -f .env ] && [ ! -e "$WT/.env" ] && [ -z "$(git ls-tree HEAD -- .env)" ]; then cp -p .env "$WT/.env"; echo "복사: $WT/.env"; fi
+while IFS= read -r f; do  # 하위 폴더의 .env 포함 (backend/.env 등)
+  f="${f#./}"; [ -n "$f" ] && [ ! -e "$WT/$f" ] && [ -z "$(git ls-tree HEAD -- "$f")" ] || continue
+  mkdir -p "$WT/$(dirname "$f")" && cp -p "$f" "$WT/$f" && echo "복사: $WT/$f"
+done <<< "$(find . \( -path ./.git -o -path ./.work -o -path ./node_modules \) -prune -o -name .env -type f -print)"
 if [ -n "$(git status --porcelain -- notes 2>/dev/null)" ]; then echo "주의: 커밋 안 된 notes/는 워크트리에 없다. 작업자가 봐야 하면 커밋하거나 지시에 요지를 넣는다."; fi
 
 # ---- 실행 (작업 폴더 안에서만 쓰기)

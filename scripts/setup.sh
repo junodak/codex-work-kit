@@ -17,7 +17,7 @@ ensure_identity() {
 }
 exclude_local() {  # 워크트리·의존성·캐시·비밀 파일은 커밋하지 않는다 (모든 워크트리가 공유하는 제외 목록)
   local ex; ex="$(git rev-parse --git-path info/exclude)"; mkdir -p "$(dirname "$ex")"  # .git이 파일이거나 상위 폴더에 있어도
-  for pat in .work/ reviews/ node_modules .venv venv __pycache__ '*.pyc' .env; do
+  for pat in /.work/ /reviews/ node_modules /.venv /venv __pycache__ '*.pyc' .env; do  # /로 시작 = 루트만 (app/reviews/ 같은 코드 폴더는 건드리지 않는다)
     grep -qxF "$pat" "$ex" 2>/dev/null || echo "$pat" >> "$ex"
   done
 }

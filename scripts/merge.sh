@@ -44,7 +44,8 @@ if [ "$SKIP_REVIEW" != "--no-review" ]; then
     [ -f "$t" ] || continue
     d="$(dirname "$t")"
     [ -f "$d/HEAD.txt" ] && [ ! -L "$d/HEAD.txt" ] || continue  # 링크는 받지 않는다 (항상 현재 HEAD를 가리킬 수 있다)
-    grep -q '판정 완료: \[x\]' "$t" && [ "$(cat "$d/HEAD.txt")" = "$TIP" ] && fresh="$d"
+    grep -qE '^판정 완료: \[x\][[:space:]]*$' "$t" &&  # 그 줄 자체여야 한다 (본문 인용은 안 됨)
+    [ "$(cat "$d/HEAD.txt")" = "$TIP" ] && fresh="$d"
   done
   [ -n "$fresh" ] || { echo "실패: 현재 HEAD($(git rev-parse --short "$BR"))를 리뷰하고 판정 완료한 라운드가 없다. 판정 뒤 고쳤으면 새 라운드(R2 등)로 다시 리뷰 → triage.md 판정 → '판정 완료: [x]'. 건너뛰려면 --no-review"; exit 1; }
   echo "판정 확인: $fresh"
