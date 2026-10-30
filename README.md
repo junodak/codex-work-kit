@@ -34,7 +34,9 @@ git clone --depth 1 https://github.com/junodak/codex-work-kit kit && bash kit/sc
 - `kit/.git`을 지워 키트를 작업 이력에 흡수한다 (중첩 저장소를 만들지 않는다).
 - git 저장소가 없으면 주어진 상태 그대로 baseline 커밋을 만든다.
 - `AGENTS.md`, `PLAN.md`, `DECISIONS.md`를 루트에 둔다. 기존 파일은 덮어쓰지 않는다.
+- 의존성·캐시·`.env`·`.work/`·`reviews/`를 로컬 제외 목록에 넣는다 (커밋되지 않게).
 - 키트와 양식만 커밋하고, 실행 환경 시간대를 보여 준다.
+- 상위 git 저장소의 하위 폴더면 멈춘다. 다시 실행해도 기준 태그는 옮기지 않는다.
 
 임시 경로를 쓰지 않는다. 키트, 기록, 리뷰 결과가 모두 작업 폴더 안에 남는다.
 
@@ -53,12 +55,12 @@ git clone --depth 1 https://github.com/junodak/codex-work-kit kit && bash kit/sc
 | `prompts.md` | 위임·리뷰 요청문, 담당자 질문, 설명 답변 틀 |
 | `templates/` | PLAN.md(조건표), DECISIONS.md(판단·정정 기록) |
 | `scripts/setup.sh` | 처음 한 번: 키트 흡수, baseline, 양식 배치, 커밋 |
-| `scripts/check.sh` | 매 단계 같은 명령으로 재검증: 테스트(npm·pytest·go·make 자동 감지) + 변경 상태. `SMOKE_CMD`·`SMOKE_URL`을 주면 서버 응답도 확인 |
+| `scripts/check.sh` | 매 단계 같은 명령으로 재검증: 찾은 테스트 러너(npm·pytest/unittest·go·make)를 전부 실행, 못 찾거나 0개면 실패 (`NO_TESTS=1` 예외) + 변경 상태. `SMOKE_CMD`·`SMOKE_URL`을 주면 서버가 직접 응답하는지도 확인 |
 | `scripts/self-quiz.sh` | 제출 전 이해 점검: 내 변경에서 설명 질문 6개를 뽑는다 (답 없음) |
 | `scripts/lastmsg.py` | `codex exec --json` 결과에서 마지막 답 추출 |
 | `scripts/research.sh` | 만들기 전 선례 조사: 표준, 함정, 이웃 코드 관례, 디자인 패턴 → `notes/` |
-| `scripts/task.sh` | 독립된 일을 워크트리(`.work/<이름>`)에서 Codex에게 맡기고 커밋 |
-| `scripts/merge.sh` | 게이트(워크트리 깨끗함·check 통과·리뷰 판정, 병합 후 check) 통과 시에만 병합, 실패하면 되돌림 |
+| `scripts/task.sh` | 독립된 일을 워크트리(`.work/<이름>`)에서 Codex에게 맡기고 커밋. 미커밋 변경이 있으면 멈추고, 의존성은 링크, kit/ 변경은 되돌린다 |
+| `scripts/merge.sh` | 게이트(워크트리 깨끗함·check 통과, **현재 HEAD를 리뷰하고 판정 완료**, kit/ 변경 없음, 병합 후 check) 통과 시에만 병합, 실패하면 되돌림 |
 | `scripts/review.sh` | 빠른 리뷰 1회: 읽기 전용 별도 세션 하나. 결과는 `reviews/` |
 | `scripts/review-round.sh` | 다관점 블라인드 리뷰 한 라운드: 관점 4개(동작·실패 경로·정합·필요성)를 읽기 전용으로 병렬 실행 → `reviews/<라운드>/summary.md`, `triage.md` |
 | `review/` | 리뷰 프롬프트(라운드마다 같은 문장으로 고정)와 판정 양식 |
