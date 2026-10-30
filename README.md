@@ -13,3 +13,4 @@ cp /tmp/kit/templates/PLAN.md /tmp/kit/templates/DECISIONS.md ./
 - `AGENTS.md`: Codex 작업 원칙
 - `templates/PLAN.md`, `templates/DECISIONS.md`: 조건표와 판단 기록 양식
 - `prompts.md`: 위임·리뷰 요청문, 업무 담당자 질문 목록, 설명 답변 틀
+- `mcp-example.json`: 키가 필요 없는 문서 조회 MCP 예시. 기본은 MCP를 쓰지 않는다. 필요할 때만 시도하고, 안 되면 버린다(동작 미확인).
