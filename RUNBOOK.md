@@ -19,10 +19,10 @@
 
 ```bash
 bash kit/scripts/research.sh "<모델>" <주제> "<하려는 것 한 문장>"     # notes/research-<주제>.md
-bash kit/scripts/task.sh "<모델>" api "<지시>" &                      # work/api, 브랜치 task/api
+bash kit/scripts/task.sh "<모델>" api "<지시>" &                      # .work/api, 브랜치 task/api
 bash kit/scripts/task.sh "<모델>" ui  "<지시>" &                      # 겹치지 않는 영역만 병렬로
 wait
-(cd work/api && bash kit/scripts/check.sh && bash kit/scripts/review-round.sh R1 "<모델>")   # triage.md 작성
+(cd .work/api && bash kit/scripts/check.sh && bash kit/scripts/review-round.sh R1 "<모델>")   # triage.md 작성
 bash kit/scripts/merge.sh api                                         # 게이트 통과 시에만 병합
 ```
 
@@ -30,6 +30,19 @@ bash kit/scripts/merge.sh api                                         # 게이�
 - 작업 지시에는 PLAN.md의 조건 ID를 넣는다. 조건 밖 작업은 시키지 않는다.
 - 병합 순서는 의존 순서대로 (API 먼저, 화면 나중). 두 번째 병합 전에 워크트리를 최신 main으로 다시 만든다.
 - 작은 과제면 워크트리 없이 주 세션 하나로 한다. 파이프라인은 일이 둘 이상으로 갈라질 때 쓴다.
+
+## 실측 (작은 레포 과제, 무인 실행)
+
+| 일 | 걸린 시간 |
+|---|---|
+| 선례 조사 (`research.sh`, 웹 검색 10회 안팎) | 약 2~3분 |
+| 기존 코드 결함 수정, 한 세션으로 끝까지 (조건 고정·수정·자체 리뷰·문서) | 약 21분 |
+| 워크트리 구현 하나 (로직·API 또는 화면) | 약 5~8분 |
+| 4관점 리뷰 라운드 | 약 3~4분 |
+| 설명 질문 생성 (`self-quiz.sh`) | 약 1분 |
+
+- 에이전트의 구현 시간은 180분의 일부일 뿐이다. 남는 시간은 **요구 질문, 검증, 판정, 설명 준비**에 쓴다. 점수를 가르는 곳이 거기다.
+- 숫자는 과제 크기에 따라 달라진다. 첫 위임의 실제 시간을 보고 나머지 배분을 다시 잡는다.
 
 ## 병렬 운영
 
@@ -39,6 +52,7 @@ bash kit/scripts/merge.sh api                                         # 게이�
 - 메모리 사용률 70%를 넘으면 병렬을 늘리지 않는다.
 - 리뷰 결과를 기다리느라 필수 작업을 멈추지 않는다. 마감이 지나면 "미검토"로 두고 간다.
 - 리뷰 지적은 그대로 믿지 않는다. 코드·테스트로 재확인한 것만 고친다. 방법은 `kit/docs/methods.md` 1절.
+- **판정 초안은 에이전트가, 판정 완료는 사람이.** 에이전트는 triage.md에 재확인 결과와 채택·기각 초안을 쓴다. 사람이 읽고 동의할 때만 `판정 완료: [x]`로 바꾼다. 병합 게이트는 이 표시만 믿는다.
 - 리뷰 관점 4개를 동시에 돌리면 토큰을 그만큼 쓴다. 시간이 빠듯하면 `kit/review/prompts`에서 관점 파일을 빼서 줄인다.
 
 ## 컨텍스트와 토큰

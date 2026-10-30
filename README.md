@@ -57,7 +57,7 @@ git clone --depth 1 https://github.com/junodak/codex-work-kit kit && bash kit/sc
 | `scripts/self-quiz.sh` | 제출 전 이해 점검: 내 변경에서 설명 질문 6개를 뽑는다 (답 없음) |
 | `scripts/lastmsg.py` | `codex exec --json` 결과에서 마지막 답 추출 |
 | `scripts/research.sh` | 만들기 전 선례 조사: 표준, 함정, 이웃 코드 관례, 디자인 패턴 → `notes/` |
-| `scripts/task.sh` | 독립된 일을 워크트리(`work/<이름>`)에서 Codex에게 맡기고 커밋 |
+| `scripts/task.sh` | 독립된 일을 워크트리(`.work/<이름>`)에서 Codex에게 맡기고 커밋 |
 | `scripts/merge.sh` | 게이트(워크트리 깨끗함·check 통과·리뷰 판정, 병합 후 check) 통과 시에만 병합, 실패하면 되돌림 |
 | `scripts/review.sh` | 빠른 리뷰 1회: 읽기 전용 별도 세션 하나. 결과는 `reviews/` |
 | `scripts/review-round.sh` | 다관점 블라인드 리뷰 한 라운드: 관점 4개(동작·실패 경로·정합·필요성)를 읽기 전용으로 병렬 실행 → `reviews/<라운드>/summary.md`, `triage.md` |
