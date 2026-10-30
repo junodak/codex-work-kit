@@ -30,11 +30,17 @@ exclude_local() {  # 워크트리·의존성·캐시·비밀 파일은 커밋하
   done
 }
 exclude_local
-# 워크트리는 커밋된 상태만 본다. 커밋 안 된 변경(PLAN.md, 의존성 설치로 바뀐 package.json 등)이 있으면 멈춘다
-pending="$(git status --porcelain -- . ':!.work' ':!reviews' ':!notes')"
+# 워크트리는 커밋된 상태만 본다. 추적 중인 파일의 미커밋 변경(PLAN.md, 의존성 설치로 바뀐 package.json 등)이 있으면 멈춘다
+pending="$(git status --porcelain --untracked-files=no -- . ':!.work' ':!reviews' ':!notes')"
 if [ -n "$pending" ]; then
-  echo "중단: 커밋 안 된 변경이 있다. 워크트리에 안 들어간다. 먼저 커밋한다 (의존성을 설치했으면 package.json·lock 파일도). 테스트·실행이 만든 산출물(db·로그)이면 .gitignore에 넣는다:"
+  echo "중단: 커밋 안 된 변경이 있다. 워크트리에 안 들어간다. 먼저 커밋한다 (의존성을 설치했으면 package.json·lock 파일도):"
   echo "$pending" | head -10; exit 1
+fi
+# 새 파일은 워크트리에 없을 뿐 막지는 않는다. 필요한 파일(새 lock 파일 등)이면 커밋한다
+newfiles="$(git status --porcelain -- . ':!.work' ':!reviews' ':!notes' | grep '^??' || true)"
+if [ -n "$newfiles" ]; then
+  echo "주의: 커밋 안 된 새 파일은 워크트리에 없다 (필요하면 커밋, 산출물이면 .gitignore):"
+  echo "$newfiles" | head -5
 fi
 mkdir -p .work reviews
 git worktree add -q -b "$BR" "$WT" HEAD
