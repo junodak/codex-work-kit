@@ -19,10 +19,20 @@ LOG="reviews/task-$NAME.jsonl"
 [[ "$NAME" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "작업 이름은 영문·숫자·_-만"; exit 1; }
 [ -f kit/scripts/lastmsg.py ] || { echo "작업 폴더 루트에서 실행하세요"; exit 1; }
 [ -e "$WT" ] && { echo "이미 있음: $WT"; exit 1; }
-grep -qxF ".work/" .git/info/exclude 2>/dev/null || echo ".work/" >> .git/info/exclude
+for f in PLAN.md AGENTS.md DECISIONS.md; do
+  [ -z "$(git status --porcelain -- "$f" 2>/dev/null)" ] || { echo "중단: $f 가 커밋되지 않았다. 워크트리는 커밋된 상태만 본다. 먼저 커밋하세요."; exit 1; }
+done
+# 워크트리·의존성·캐시·비밀 파일은 커밋하지 않는다 (모든 워크트리가 공유하는 제외 목록)
+for pat in .work/ node_modules .venv venv __pycache__ '*.pyc' .env; do
+  grep -qxF "$pat" .git/info/exclude 2>/dev/null || echo "$pat" >> .git/info/exclude
+done
 mkdir -p .work reviews
 git worktree add -q -b "$BR" "$WT" HEAD
 echo "워크트리: $WT (브랜치 $BR, 기준 $(git rev-parse --short HEAD))"
+# 주 폴더의 설치된 의존성을 워크트리에서 쓰게 링크한다 (새 checkout에는 없다)
+for dep in node_modules .venv venv; do
+  if [ -d "$dep" ] && [ ! -e "$WT/$dep" ]; then ln -s "$(pwd)/$dep" "$WT/$dep"; echo "의존성 링크: $WT/$dep"; fi
+done
 
 # ---- 실행 (작업 폴더 안에서만 쓰기)
 PROMPT="이 워크트리에서 아래 작업만 한다. AGENTS.md와 PLAN.md를 먼저 읽어라.
@@ -36,9 +46,17 @@ rc=$?
 set -e
 python3 -B kit/scripts/lastmsg.py "$LOG" | tail -20 || true
 
-# ---- 커밋
+# ---- 커밋 (kit/는 검사기다. 작업이 고친 kit 변경은 되돌린다)
+if [ -n "$(git -C "$WT" status --porcelain --ignored -- kit)" ]; then
+  git -C "$WT" checkout -q -- kit && git -C "$WT" clean -qfdx -- kit
+  echo "경고: 작업이 kit/를 고쳤다. 되돌렸다 (검사기는 작업이 바꾸지 않는다)"
+fi
 if [ -n "$(git -C "$WT" status --porcelain -- . ':!reviews')" ]; then
+  # 제외 목록을 .gitignore가 뒤집을 수 있어서(!.env) 커밋 경로에서도 직접 뺀다
   git -C "$WT" add -A -- . ':!reviews'
+  for p in .env node_modules .venv venv; do  # 원래 추적하던 파일이 아니면 커밋에서 뺀다
+    [ -n "$(git -C "$WT" ls-tree HEAD -- "$p")" ] || git -C "$WT" rm -r -q --cached --ignore-unmatch -- "$p"
+  done
   SUMMARY="$(python3 -B -c 'import sys; t=" ".join(sys.argv[1].split()); print(t[:50] + ("…" if len(t) > 50 else ""))' "$TASK")"  # 글자 단위로 자른다 (한글이 깨지지 않게)
   git -C "$WT" commit -q -m "$NAME: $SUMMARY"
   echo "커밋: $(git -C "$WT" log -1 --oneline)"

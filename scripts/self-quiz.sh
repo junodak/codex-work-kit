@@ -6,6 +6,7 @@
 set -euo pipefail
 
 # ---- 설정
+[ $# -eq 1 ] || { echo "모델은 한 인자로 (공백이 있으면 따옴표)"; exit 1; }
 MODEL="${1:?모델 (/status에서 확인한 권장 모델)}"
 BASE="$(git rev-parse -q --verify work-base 2>/dev/null || git rev-list --max-parents=0 HEAD | tail -1)"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"

@@ -7,19 +7,36 @@ set -uo pipefail
 BASE="$(git rev-parse -q --verify work-base 2>/dev/null || true)"
 rc=0
 mkdir -p reviews
-run() { echo "\$ $*"; "$@"; rc=$?; }
+found=0
+run() { echo "\$ $*"; "$@"; local r=$?; found=1; [ $r -eq 0 ] || rc=$r; }
 
-# ---- 테스트 (발견한 것 하나만 실행)
+# ---- 테스트 (찾은 러너를 전부 실행한다. 백엔드·화면이 다른 언어일 수 있다)
 if [ -f package.json ] && grep -q '"test"' package.json; then
   run npm test --silent
-elif [ -f pyproject.toml ] || [ -f pytest.ini ] || ls tests/*.py test_*.py >/dev/null 2>&1; then
-  if python3 -c "import pytest" 2>/dev/null; then run python3 -m pytest -q; else run python3 -m unittest discover -s tests -q; fi
-elif [ -f go.mod ]; then
+fi
+if [ -f pyproject.toml ] || [ -f pytest.ini ] || [ -f setup.cfg ] || compgen -G 'tests/*.py' >/dev/null || compgen -G 'test_*.py' >/dev/null || compgen -G '*/test_*.py' >/dev/null; then
+  PY=python3  # 작업 폴더의 가상환경이 있으면 그 python (설치한 pytest가 거기 있다)
+  for v in .venv venv; do if [ -x "$v/bin/python" ]; then PY="$v/bin/python"; break; fi; done
+  if "$PY" -c "import pytest" 2>/dev/null; then run "$PY" -m pytest -q
+  else  # pytest가 없으면 표준 unittest. 테스트가 tests/ 밖에 있을 수도 있다
+    START=.; [ -d tests ] && START=tests
+    echo "\$ $PY -m unittest discover -s $START"
+    out="$("$PY" -m unittest discover -s "$START" 2>&1)"; r=$?; found=1
+    echo "$out"
+    # 버전에 따라 0개 실행을 통과로 끝낸다. 가짜 통과를 막는다
+    if echo "$out" | grep -q '^Ran 0 tests'; then r=1; echo "unittest가 테스트를 0개 실행했다. pytest 형식 테스트면 pytest를 설치한다 (pip install pytest)"; fi
+    [ $r -eq 0 ] || rc=$r
+  fi
+fi
+if [ -f go.mod ]; then
   run go test ./...
-elif [ -f Makefile ] && grep -q '^test:' Makefile; then
+fi
+if [ $found = 0 ] && [ -f Makefile ] && grep -q '^test:' Makefile; then
   run make test
-else
+fi
+if [ $found = 0 ]; then
   echo "테스트 명령을 찾지 못함. 과제 안내에서 실행 방법을 확인한다."
+  if [ "${NO_TESTS:-}" = 1 ]; then echo "NO_TESTS=1: 테스트 없이 통과로 둔다"; else rc=1; echo "실패로 처리한다 (테스트가 정말 없으면 NO_TESTS=1)"; fi
 fi
 echo "테스트 종료 코드: $rc"
 
