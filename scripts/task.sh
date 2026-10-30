@@ -18,17 +18,28 @@ LOG="reviews/task-$NAME.jsonl"
 # ---- 준비
 [[ "$NAME" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "작업 이름은 영문·숫자·_-만"; exit 1; }
 [ -f kit/scripts/lastmsg.py ] || { echo "작업 폴더 루트에서 실행하세요"; exit 1; }
-[ -e "$WT" ] && { echo "이미 있음: $WT"; exit 1; }
-for f in PLAN.md AGENTS.md DECISIONS.md; do
-  [ -z "$(git status --porcelain -- "$f" 2>/dev/null)" ] || { echo "중단: $f 가 커밋되지 않았다. 워크트리는 커밋된 상태만 본다. 먼저 커밋하세요."; exit 1; }
-done
-# 워크트리·의존성·캐시·비밀 파일은 커밋하지 않는다 (모든 워크트리가 공유하는 제외 목록)
-for pat in .work/ node_modules .venv venv __pycache__ '*.pyc' .env; do
-  grep -qxF "$pat" .git/info/exclude 2>/dev/null || echo "$pat" >> .git/info/exclude
-done
+TARGET="$(git branch --show-current)"
+[ -n "$TARGET" ] || { echo "중단: 주 폴더가 브랜치 위에 있지 않다(분리 HEAD). git switch <주 브랜치> 뒤 다시."; exit 1; }
+if [ -e "$WT" ] || git rev-parse -q --verify "refs/heads/$BR" >/dev/null; then
+  echo "이미 있음: $WT 또는 브랜치 $BR. 다른 이름을 쓴다 (버릴 거면: git worktree remove --force $WT; git branch -D $BR)"; exit 1
+fi
+exclude_local() {  # 워크트리·의존성·캐시·비밀 파일은 커밋하지 않는다 (모든 워크트리가 공유하는 제외 목록)
+  local ex; ex="$(git rev-parse --git-path info/exclude)"; mkdir -p "$(dirname "$ex")"  # .git이 파일이거나 상위 폴더에 있어도
+  for pat in .work/ node_modules .venv venv __pycache__ '*.pyc' .env; do
+    grep -qxF "$pat" "$ex" 2>/dev/null || echo "$pat" >> "$ex"
+  done
+}
+exclude_local
+# 워크트리는 커밋된 상태만 본다. 커밋 안 된 변경(PLAN.md, 의존성 설치로 바뀐 package.json 등)이 있으면 멈춘다
+pending="$(git status --porcelain -- . ':!.work' ':!reviews' ':!notes')"
+if [ -n "$pending" ]; then
+  echo "중단: 커밋 안 된 변경이 있다. 워크트리에 안 들어간다. 먼저 커밋한다 (의존성을 설치했으면 package.json·lock 파일도):"
+  echo "$pending" | head -10; exit 1
+fi
 mkdir -p .work reviews
 git worktree add -q -b "$BR" "$WT" HEAD
-echo "워크트리: $WT (브랜치 $BR, 기준 $(git rev-parse --short HEAD))"
+echo "$TARGET" > "$(git -C "$WT" rev-parse --absolute-git-dir)/kit-target"  # 병합 대상. 워크트리 전용 파일이라 병렬로 써도 잠금 충돌이 없다
+echo "워크트리: $WT (브랜치 $BR, 기준 $TARGET $(git rev-parse --short HEAD))"
 # 주 폴더의 설치된 의존성을 워크트리에서 쓰게 링크한다 (새 checkout에는 없다)
 for dep in node_modules .venv venv; do
   if [ -d "$dep" ] && [ ! -e "$WT/$dep" ]; then ln -s "$(pwd)/$dep" "$WT/$dep"; echo "의존성 링크: $WT/$dep"; fi
@@ -38,6 +49,7 @@ done
 PROMPT="이 워크트리에서 아래 작업만 한다. AGENTS.md와 PLAN.md를 먼저 읽어라.
 작업: $TASK
 - 이 작업 범위 밖의 파일은 고치지 마라. git 명령(commit, branch 등)은 쓰지 마라. 커밋은 바깥에서 한다.
+- PLAN.md·DECISIONS.md는 고치지 마라 (병렬 작업끼리 충돌한다). 결정·가정·남은 조건은 보고에 적어라. 주 세션이 옮긴다.
 - 관련 테스트를 추가하거나 고치고, 실행해서 결과를 확인해라.
 - 끝나면 변경 파일, 실행한 명령과 결과, 남은 조건만 짧게 보고해라."
 set +e
@@ -63,5 +75,10 @@ if [ -n "$(git -C "$WT" status --porcelain -- . ':!reviews')" ]; then
 else
   echo "변경 없음"
 fi
-echo "codex 종료 코드: $rc. 다음: (cd $WT && bash kit/scripts/check.sh) → 리뷰 → bash kit/scripts/merge.sh $NAME"
+if [ $rc -ne 0 ] && [ -z "$(git log --oneline "HEAD..$BR")" ]; then
+  echo "codex 실패 (종료 코드 $rc), 변경 없음. 이유:"; tail -5 "${LOG%.jsonl}.err"
+  git worktree remove --force "$WT" && git branch -q -D "$BR" && echo "워크트리·브랜치를 지웠다. 원인(모델 ID 등)을 고쳐 같은 이름으로 다시 실행해도 된다."
+  exit $rc
+fi
+echo "codex 종료 코드: $rc. 다음: (cd $WT && bash kit/scripts/check.sh && bash kit/scripts/review-round.sh R1 \"<모델 ID>\") → 루트에서 bash kit/scripts/merge.sh $NAME"
 exit $rc

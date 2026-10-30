@@ -24,7 +24,7 @@ if [ -f pyproject.toml ] || [ -f pytest.ini ] || [ -f setup.cfg ] || compgen -G 
     out="$("$PY" -m unittest discover -s "$START" 2>&1)"; r=$?; found=1
     echo "$out"
     # 버전에 따라 0개 실행을 통과로 끝낸다. 가짜 통과를 막는다
-    if echo "$out" | grep -q '^Ran 0 tests'; then r=1; echo "unittest가 테스트를 0개 실행했다. pytest 형식 테스트면 pytest를 설치한다 (pip install pytest)"; fi
+    if echo "$out" | grep -q '^Ran 0 tests'; then r=1; echo "unittest가 테스트를 0개 실행했다. pytest 형식 테스트면 pytest를 설치한다 ($PY -m pip install pytest)"; fi
     [ $r -eq 0 ] || rc=$r
   fi
 fi

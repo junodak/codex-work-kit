@@ -12,11 +12,15 @@ WT=".work/$NAME"
 BR="task/$NAME"
 
 # ---- 준비
+[ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ] || { echo "주 작업 폴더 루트에서 실행한다 (지금 위치: $(pwd)). 워크트리 안이면 cd 로 루트로."; exit 1; }
 [ -d "$WT" ] || { echo "워크트리 없음: $WT"; exit 1; }
 # 실패 시 reset --hard로 되돌리므로 tracked 변경은 하나도 없어야 한다. 새 파일은 .work·reviews·notes 아래만 허용
 [ -z "$(git status --porcelain --untracked-files=no)" ] && [ -z "$(git status --porcelain -- . ':!.work' ':!reviews' ':!notes')" ] \
-  || { echo "주 브랜치에 커밋 안 된 변경이 있다. 먼저 정리하세요."; exit 1; }
+  || { echo "주 브랜치에 커밋 안 된 변경이 있다. 필요한 변경(의존성의 package.json·lock 등)은 커밋하고, 아니면 되돌린 뒤 다시:"; git status --short -- . ':!.work' ':!reviews' ':!notes' | head -10; exit 1; }
 TARGET="$(git branch --show-current)"
+[ -n "$TARGET" ] || { echo "중단: 주 폴더가 브랜치 위에 있지 않다(분리 HEAD). git switch <주 브랜치> 뒤 다시."; exit 1; }
+WANT="$(cat "$(git -C "$WT" rev-parse --absolute-git-dir)/kit-target" 2>/dev/null || true)"
+[ -z "$WANT" ] || [ "$WANT" = "$TARGET" ] || { echo "중단: $NAME 은 $WANT 에서 갈라졌는데 지금 주 폴더는 $TARGET 이다. git switch $WANT 뒤 다시."; exit 1; }
 ROOT="$(pwd)"
 # 검사기(kit/)는 작업 브랜치가 바꿀 수 없다. 바꿨다면 게이트가 바뀐 검사기로 돌게 된다
 git diff --quiet "HEAD...$BR" -- kit || { echo "실패: $BR 이 kit/를 고쳤다. 검사기 변경은 병합하지 않는다."; exit 1; }
@@ -50,7 +54,7 @@ if [ -d "$WT/reviews" ]; then mkdir -p "reviews/merged-$NAME" && cp -R "$WT"/rev
 
 # ---- 병합과 게이트 3
 BEFORE="$(git rev-parse HEAD)"
-git merge -q --no-ff "$BR" -m "merge $BR: 게이트 통과" || { git merge --abort 2>/dev/null; echo "실패: 병합 충돌. 되돌렸다. 워크트리에서 충돌 영역을 줄여 다시."; exit 1; }
+git merge -q --no-ff "$BR" -m "merge $BR: 게이트 통과" || { git merge --abort 2>/dev/null; echo "실패: 병합 충돌. 되돌렸다. 복구: (cd $WT && git merge $TARGET) → 충돌 해결 → git commit → 새 라운드(R2) 리뷰·판정 → 다시 merge.sh"; exit 1; }
 echo "== 게이트 3: $TARGET 에서 check.sh"
 if bash kit/scripts/check.sh; then
   # 커밋은 이미 병합됐다. 워크트리에 남은 것은 위에서 옮긴 reviews/와 check.sh 산출물, 의존성 링크뿐이다

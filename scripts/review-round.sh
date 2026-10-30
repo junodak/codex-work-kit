@@ -8,12 +8,18 @@ set -euo pipefail
 # ---- 설정
 ROUND="${1:?라운드명 (예: R1)}"
 MODEL="${2:?모델 (/status에서 확인한 권장 모델)}"
-BASE="${3:-$(git rev-parse -q --verify work-base 2>/dev/null || git rev-list --max-parents=0 HEAD | tail -1)}"
+# 기준: 인자 > (워크트리면) 주 브랜치와의 merge-base = 이 작업의 변경만 > work-base > 첫 커밋
+fork_point() {  # task.sh가 워크트리에 기록한 병합 대상 브랜치와의 merge-base
+  local f; f="$(git rev-parse --absolute-git-dir)/kit-target"
+  [ -f "$f" ] && git merge-base HEAD "$(cat "$f")"
+}
+BASE="${3:-$(fork_point 2>/dev/null || git rev-parse -q --verify work-base 2>/dev/null || git rev-list --max-parents=0 HEAD | tail -1)}"
 KIT=kit/review
 OUT="reviews/$ROUND"
 
 # ---- 준비
 git rev-parse -q --verify "$BASE^{commit}" >/dev/null || { echo "BASE가 커밋이 아니다: $BASE (모델 이름에 공백이 있으면 따옴표로 감싼다)"; exit 1; }
+[ "$(git rev-parse "$BASE^{commit}")" != "$(git rev-parse HEAD)" ] || { echo "중단: 리뷰할 변경이 없다 (BASE = HEAD). 워크트리 작업이면 .work/<이름> 안에서, 주 폴더면 커밋한 뒤 실행한다."; exit 1; }
 [[ "$ROUND" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "라운드명은 영문·숫자·_-만"; exit 1; }
 [ -d "$KIT/prompts" ] || { echo "작업 폴더 루트에서 실행하세요"; exit 1; }
 [ -e "$OUT" ] && { echo "이미 있음: $OUT (라운드명을 바꾸세요)"; exit 1; }
@@ -56,4 +62,9 @@ head = (f"# 리뷰 요약\n\n실패한 관점: {len(failed)}개 {' '.join(failed
 PY
 sed "s/라운드 R?/라운드 $ROUND/" "$KIT/triage.md" > "$OUT/triage.md"
 echo "완료: $OUT/summary.md 를 읽고 $OUT/triage.md 에 판정을 적는다"
-if [ -f "$OUT/failed.txt" ]; then echo "실패한 관점: $(tr '\n' ' ' < "$OUT/failed.txt")"; exit 2; fi
+if [ -f "$OUT/failed.txt" ]; then
+  echo "실패한 관점: $(tr '\n' ' ' < "$OUT/failed.txt")"
+  for n in $(cat "$OUT/failed.txt"); do echo "--- $n 이유:"; tail -3 "$OUT/$n.err"; done
+  echo "모델 ID 문제면 고쳐서, 일시 오류면 그대로 새 라운드명(R2)으로 다시"
+  exit 2
+fi
