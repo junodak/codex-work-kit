@@ -25,6 +25,7 @@
 | VoltAgent/awesome-agent-skills | https://github.com/VoltAgent/awesome-agent-skills | 공식·커뮤니티 에이전트 스킬 큐레이션 목록 | 목록에서 링크 따라가기 | MIT | 확인 (약 36.6k★) |
 | awesome-claude-code | https://github.com/hesreallyhim/awesome-claude-code | Claude Code 스킬·훅·명령 자료 큐레이션 | 목록만 읽기 | NOASSERTION(직접 확인) | 확인 (약 56.9k★) |
 | awesome-claude-skills | https://github.com/ComposioHQ/awesome-claude-skills | Claude 스킬 큐레이션 목록 | 목록만 읽기 | 표기 없음 | 확인 (약 78k★, 9/18 이후 push 없음) |
+| open-design | https://github.com/nexu-io/open-design | AI 디자인 에이전트 작업공간. 디자인시스템을 DESIGN.md와 skills로 기술 | `DESIGN.md`·skills 구조만 읽기 (저장소가 크다, 통째로 clone하지 않음) | Apache-2.0 | 확인 (약 105k★, 10/30 push) |
 | awesome-cursorrules | https://github.com/PatrickJS/awesome-cursorrules | Cursor 규칙 파일 모음(지침 작성 예시 참고용) | 읽기만 | CC0-1.0 | 확인 (약 41k★, 5/30 이후 push 없음) |
 
 ## 2. 용도별 묶음과 볼 경로 (모두 저장소 목록 조회로 확인한 경로)
