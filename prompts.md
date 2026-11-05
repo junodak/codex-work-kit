@@ -12,7 +12,7 @@
 
 작업 폴더 루트에서 실행한다. 읽기 전용이 실제로 강제되고 결과가 `reviews/`에 JSONL로 남는다. `<모델 ID>`는 `/status`에서 확인한 권장 모델.
 
-- 다관점 한 라운드 (권장): `bash kit/scripts/review-round.sh R1 "<모델 ID>"` → `reviews/R1/summary.md` 읽고 `triage.md`에 판정
+- 다관점 한 라운드 (권장): `bash kit/scripts/review-round.sh R1 "<모델 ID>"` → `reviews/<작업>/R1/summary.md` 읽고 `triage.md`에 판정 (경로는 스크립트가 끝에 출력)
 - 빠른 1회: `bash kit/scripts/review.sh "<모델 ID>"`
 - 리뷰 프롬프트 원문: `kit/review/prompts/` (라운드마다 같은 문장으로 고정)
 - 지적은 그대로 믿지 않는다. 코드·테스트로 재확인한 것만 고친다.
@@ -40,3 +40,10 @@
 `압축 전에 핸드오프해: PLAN.md 조건 상태를 지금 실제와 맞추고, DECISIONS.md에 이번 세션의 결정·버린 대안·검증 결과·미해결과 다음 한 걸음을 적고, 커밋해. 적지 않은 것은 압축 뒤에 사라진다.`
 
 압축이나 새 세션 뒤에는 `PLAN.md와 DECISIONS.md를 읽고, 미해결과 다음 한 걸음부터 이어서 해.`
+
+## QA 피드백 → 이슈 (QA 세션)
+
+`내가 방금 화면을 써 보고 한 말을 kit/templates/ISSUE.md 양식으로 issues/ 아래 이슈 파일로 만들어. 해결책을 정하지 말고 관찰·재현 순서·완료 기준을 적고, 원본 요구·담당자 답변과 대조해 분류(필수/합의한 추가/제안)해. 번호는 issues/에서 다음 번호. 커밋하고 경로만 알려줘. 코드는 고치지 마.`
+
+메인 세션에는: `issues/NNN-....md 를 읽고, 채택이면 PLAN 조건으로 올린 뒤 처리해. 끝나면 이슈의 처리 칸(커밋·검증·남은 사람 QA)을 채우고 커밋해.`
+

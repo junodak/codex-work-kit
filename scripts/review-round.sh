@@ -2,7 +2,8 @@
 # 다관점 블라인드 리뷰 한 라운드. 관점마다 읽기 전용 Codex 세션을 병렬로 띄운다.
 # 사용 (작업 폴더 루트에서): bash kit/scripts/review-round.sh <라운드명> <모델> [BASE]
 #   예: bash kit/scripts/review-round.sh R1 <권장 모델>
-# 결과: reviews/<라운드>/<관점>.jsonl (원본), <관점>.md (마지막 답), summary.md, triage.md (판정 양식)
+# 결과: reviews/<작업>/<라운드>/ 아래 <관점>.jsonl (원본), <관점>.md (마지막 답), summary.md, triage.md (판정 양식)
+#   <작업>은 브랜치 task/<작업>의 이름, 주 브랜치면 그 브랜치 이름. 기록은 커밋해서 산출물로 남긴다
 set -euo pipefail
 
 # ---- 설정
@@ -15,7 +16,8 @@ fork_point() {  # task.sh가 워크트리에 기록한 병합 대상 브랜치�
 }
 BASE="${3:-$(fork_point 2>/dev/null || git rev-parse -q --verify work-base 2>/dev/null || git rev-list --max-parents=0 HEAD | tail -1)}"
 KIT=kit/review
-OUT="reviews/$ROUND"
+SCOPE="$(git branch --show-current)"; SCOPE="${SCOPE#task/}"; SCOPE="${SCOPE:-detached}"
+OUT="reviews/$SCOPE/$ROUND"  # 작업별 폴더: 병합 뒤 다음 워크트리가 물려받아도 겹치지 않는다
 
 # ---- 준비
 git rev-parse -q --verify "$BASE^{commit}" >/dev/null || { echo "BASE가 커밋이 아니다: $BASE (모델 이름에 공백이 있으면 따옴표로 감싼다)"; exit 1; }

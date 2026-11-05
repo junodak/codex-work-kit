@@ -66,7 +66,7 @@ if [ -n "${SMOKE_CMD:-}" ] && [ -n "${SMOKE_URL:-}" ]; then
   if [ "$(curl -s -o /dev/null -w '%{http_code}' "$SMOKE_URL" || true)" != 000 ]; then
     echo "실패: 띄우기 전에 이미 $SMOKE_URL 이 응답한다 (다른 서버가 포트를 쓰는 중). 그 서버를 끄거나 다른 포트로."; rc=1
   else
-    bash -c "$SMOKE_CMD" > reviews/smoke-server.log 2>&1 &
+    mkdir -p .work; bash -c "$SMOKE_CMD" > .work/smoke-server.log 2>&1 &  # 매번 덮어쓰는 로그라 커밋하지 않는 .work/에
     spid=$!
     for _ in $(seq 1 30); do
       kill -0 "$spid" 2>/dev/null || { echo "서버가 뜨다가 종료됐다"; break; }
@@ -76,7 +76,7 @@ if [ -n "${SMOKE_CMD:-}" ] && [ -n "${SMOKE_URL:-}" ]; then
     done
   fi
   [ -n "${spid:-}" ] && { killtree "$spid"; wait "$spid" 2>/dev/null; }  # npm → sh → node 처럼 손자까지 끈다
-  echo "스모크 응답: HTTP $code (서버 로그: reviews/smoke-server.log)"
+  echo "스모크 응답: HTTP $code (서버 로그: .work/smoke-server.log)"
   case "$code" in 2*|3*) ;; *) rc=1 ;; esac
 fi
 

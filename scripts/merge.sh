@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 워크트리 작업을 게이트를 통과할 때만 main에 병합한다. 실패하면 병합을 되돌린다.
 # 사용 (작업 폴더 루트에서, 주 브랜치에 있을 때): bash kit/scripts/merge.sh <작업-이름> [--no-review]
-# 게이트: 1) 워크트리가 깨끗하고 check.sh 통과  2) 리뷰 판정 완료 표시(.work/<이름>/reviews/*/triage.md 의 '판정 완료: [x]')
+# 게이트: 1) 워크트리가 깨끗하고 check.sh 통과  2) 리뷰 판정 완료 표시(.work/<이름>/reviews/<이름>/*/triage.md 의 '판정 완료: [x]')
+# 리뷰·판정 기록은 작업 브랜치에 커밋해 함께 병합한다 (산출물로 남긴다)
 #         3) 병합 후 주 브랜치에서 check.sh 통과
 set -euo pipefail
 
@@ -36,31 +37,35 @@ for dep in node_modules .venv venv; do  # task.sh가 만든 의존성 링크가 
 done
 (cd "$WT" && bash "$ROOT/kit/scripts/check.sh") || { echo "실패: 워크트리 검증. 병합하지 않는다."; exit 1; }  # 주 폴더의 검사기로
 
+# ---- 리뷰 기록을 작업 브랜치에 커밋 (판정 표시 포함, 병합과 함께 남는다)
+if [ -n "$(git -C "$WT" status --porcelain -- reviews)" ]; then
+  git -C "$WT" add -- reviews && git -C "$WT" commit -q -m "$NAME: 리뷰·판정 기록" -- reviews && echo "리뷰 기록 커밋: $(git -C "$WT" log -1 --oneline)"
+fi
+
 # ---- 게이트 2: 리뷰 판정 기록
 if [ "$SKIP_REVIEW" != "--no-review" ]; then
-  # 판정 완료 표시가 있고, 그 라운드가 리뷰한 커밋이 지금 브랜치 HEAD와 같아야 한다 (판정 뒤 수정했으면 다시 리뷰)
-  TIP="$(git rev-parse "$BR")"; fresh=""
-  for t in "$WT"/reviews/*/triage.md; do
+  # 판정 완료 표시가 있고, 그 라운드가 리뷰한 커밋이 코드가 마지막으로 바뀐 커밋과 같아야 한다 (판정 뒤 수정했으면 다시 리뷰)
+  # 리뷰 기록만 바꾼 커밋은 건너뛴다
+  TIP="$(git rev-list -1 "$BR" -- . ':!reviews')"; fresh=""
+  for t in "$WT"/reviews/"$NAME"/*/triage.md; do
     [ -f "$t" ] || continue
     d="$(dirname "$t")"
     [ -f "$d/HEAD.txt" ] && [ ! -L "$d/HEAD.txt" ] || continue  # 링크는 받지 않는다 (항상 현재 HEAD를 가리킬 수 있다)
     grep -qE '^판정 완료: \[x\][[:space:]]*$' "$t" &&  # 그 줄 자체여야 한다 (본문 인용은 안 됨)
     [ "$(cat "$d/HEAD.txt")" = "$TIP" ] && fresh="$d"
   done
-  [ -n "$fresh" ] || { echo "실패: 현재 HEAD($(git rev-parse --short "$BR"))를 리뷰하고 판정 완료한 라운드가 없다. 판정 뒤 고쳤으면 새 라운드(R2 등)로 다시 리뷰 → triage.md 판정 → '판정 완료: [x]'. 건너뛰려면 --no-review"; exit 1; }
+  [ -n "$fresh" ] || { echo "실패: 현재 코드($(git rev-parse --short "$TIP"))를 리뷰하고 판정 완료한 라운드가 없다. 판정 뒤 고쳤으면 새 라운드(R2 등)로 다시 리뷰 → triage.md 판정 → '판정 완료: [x]'. 건너뛰려면 --no-review"; exit 1; }
   echo "판정 확인: $fresh"
 fi
-# 워크트리의 리뷰·검증 기록은 정리 전에 주 작업 폴더로 옮겨 보존한다
-if [ -d "$WT/reviews" ]; then mkdir -p "reviews/merged-$NAME" && cp -R "$WT"/reviews/. "reviews/merged-$NAME/"; fi
 
 # ---- 병합과 게이트 3
 BEFORE="$(git rev-parse HEAD)"
 git merge -q --no-ff "$BR" -m "merge $BR: 게이트 통과" || { git merge --abort 2>/dev/null; echo "실패: 병합 충돌. 되돌렸다. 복구: (cd $WT && git merge $TARGET) → 충돌 해결 → git commit → 새 라운드(R2) 리뷰·판정 → 다시 merge.sh"; exit 1; }
 echo "== 게이트 3: $TARGET 에서 check.sh"
 if bash kit/scripts/check.sh; then
-  # 커밋은 이미 병합됐다. 워크트리에 남은 것은 위에서 옮긴 reviews/와 check.sh 산출물, 의존성 링크뿐이다
+  # 커밋(리뷰 기록 포함)은 이미 병합됐다. 워크트리에 남은 것은 .work/ 로그와 의존성 링크뿐이다
   if git worktree remove --force "$WT"; then
-    echo "병합 완료: $BR → $TARGET, 워크트리 정리 (기록: reviews/merged-$NAME). 같은 이름은 다시 쓰지 않는다"
+    echo "병합 완료: $BR → $TARGET, 워크트리 정리 (기록: reviews/$NAME/). 같은 이름은 다시 쓰지 않는다"
   else
     echo "병합은 완료. 워크트리 정리 실패: $WT 를 직접 확인하세요"
   fi

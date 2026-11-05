@@ -15,7 +15,7 @@ Codex로 짧은 업무 과제(기존 코드 수정, 작은 도구 제작)를 할
 | 선례 조사 | `notes/research-<주제>.md` 표준·함정·이웃 코드·디자인 패턴 (출처) | 읽기 전용 에이전트 |
 | 구현 | 작은 단위 커밋. 병렬이면 워크트리별 브랜치 `task/<이름>` | 주 세션 또는 워크트리마다 한 세션 |
 | 검증 | 조건별 실행 결과 (`checklists.md`) | 에이전트가 실행, 사람이 화면 확인 |
-| 리뷰 | `reviews/<라운드>/` 4관점 블라인드 결과 | 읽기 전용 에이전트들, 서로 독립 |
+| 리뷰 | `reviews/<작업>/<라운드>/` 4관점 블라인드 결과 (커밋해 산출물로 남김) | 읽기 전용 에이전트들, 서로 독립 |
 | 판정·병합 | `triage.md` 채택·기각과 재확인 근거, 게이트를 통과한 병합 커밋 | 사람이 판정, 스크립트가 게이트 |
 | 기록 | `DECISIONS.md` 결정·대안·근거·한계·정정 | 에이전트가 쓰고 사람이 대조 |
 
@@ -53,7 +53,7 @@ git clone --depth 1 https://github.com/junodak/codex-work-kit kit && bash kit/sc
 | `RUNBOOK.md` | 시작할 때: 180분 시간 배분, 병렬·컨텍스트·권한 규칙 |
 | `checklists.md` | 요구 확인, 날짜·시간대, 조건별 검증, 제출 전 |
 | `prompts.md` | 위임·리뷰 요청문, 담당자 질문, 설명 답변 틀 |
-| `templates/` | PLAN.md(조건표), DECISIONS.md(판단·정정 기록) |
+| `templates/` | PLAN.md(조건표), DECISIONS.md(판단·정정 기록), ISSUE.md(사람 QA 피드백 → 이슈) |
 | `scripts/setup.sh` | 처음 한 번: 키트 흡수, baseline, 양식 배치, 커밋 |
 | `scripts/check.sh` | 매 단계 같은 명령으로 재검증: 찾은 테스트 러너(npm·pytest/unittest·go·make)를 전부 실행, 못 찾거나 0개면 실패 (`NO_TESTS=1` 예외) + 변경 상태. `SMOKE_CMD`·`SMOKE_URL`을 주면 서버가 직접 응답하는지도 확인 |
 | `scripts/self-quiz.sh` | 제출 전 이해 점검: 내 변경에서 설명 질문 6개를 뽑는다 (답 없음) |
@@ -62,7 +62,7 @@ git clone --depth 1 https://github.com/junodak/codex-work-kit kit && bash kit/sc
 | `scripts/task.sh` | 독립된 일을 워크트리(`.work/<이름>`)에서 Codex에게 맡기고 커밋. 미커밋 변경이 있으면 멈추고, 의존성은 링크, kit/ 변경은 되돌린다 |
 | `scripts/merge.sh` | 게이트(워크트리 깨끗함·check 통과, **현재 HEAD를 리뷰하고 판정 완료**, kit/ 변경 없음, 병합 후 check) 통과 시에만 병합, 실패하면 되돌림 |
 | `scripts/review.sh` | 빠른 리뷰 1회: 읽기 전용 별도 세션 하나. 결과는 `reviews/` |
-| `scripts/review-round.sh` | 다관점 블라인드 리뷰 한 라운드: 관점 4개(동작·실패 경로·정합·필요성)를 읽기 전용으로 병렬 실행 → `reviews/<라운드>/summary.md`, `triage.md` |
+| `scripts/review-round.sh` | 다관점 블라인드 리뷰 한 라운드: 관점 4개(동작·실패 경로·정합·필요성)를 읽기 전용으로 병렬 실행 → `reviews/<작업>/<라운드>/summary.md`, `triage.md` (작업=브랜치 이름) |
 | `review/` | 리뷰 프롬프트(라운드마다 같은 문장으로 고정)와 판정 양식 |
 | `docs/philosophy.md` | 판단이 막힐 때: 어디까지 파고 언제 멈추나 |
 | `docs/sot-principles.md` | 근거·기록을 다룰 때: 원천과 파생, 한 사실 한 곳 |
